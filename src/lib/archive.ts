@@ -1,27 +1,16 @@
 import { db } from "@/db";
 import { persons, sourcePages, revisions, backupEvents } from "@/db/schema";
-import { asc, desc, eq, or, sql } from "drizzle-orm";
-import { seedPages, seedPersons } from "./seed";
+import { asc, desc, eq, or } from "drizzle-orm";
 import { visiblePeople, type ArchiveData, type DualDate, type EntryStatus, type Person, type SourcePage } from "./types";
 
 let ready = false;
 export async function ensureSeeded() {
   if (ready) return;
-  await db.transaction(async tx => {
-    await tx.execute(sql`select pg_advisory_xact_lock(26061117)`);
-    const [existing] = await tx.select({ id: persons.id }).from(persons).limit(1);
-    if (!existing) {
-      await tx.insert(sourcePages).values(seedPages).onConflictDoNothing();
-      await tx.insert(persons).values(seedPersons).onConflictDoNothing();
-      await tx.insert(revisions).values([
-        { personId: "p8", name: "陈德清", action: "完成校对", detail: { message: "与卷一第十二页原文核对" }, createdAt: "2026-11-17T08:30:00Z" },
-        { personId: "me", name: "陈知远", action: "补充人物小传", detail: { message: "记录当代族人的故事" }, createdAt: "2026-11-16T15:20:00Z" },
-        { personId: "p13", name: "陈思齐", action: "新增族人", detail: { message: "第十三世 · 据家人口述补录" }, createdAt: "2026-11-15T10:15:00Z" },
-      ]);
-    }
-  });
+  // Database tables are auto-created in db/index.ts.
+  // Data starts empty for Li Family Tree production use.
   ready = true;
 }
+
 export async function getArchive(role: "admin" | "visitor"): Promise<ArchiveData> {
   await ensureSeeded();
   const [allPersons, pages, history] = await Promise.all([
@@ -32,9 +21,20 @@ export async function getArchive(role: "admin" | "visitor"): Promise<ArchiveData
   const people = role === "admin" ? allPersons : visiblePeople(allPersons);
   const visible = new Set(people.map(p => p.id));
   const allowedPages = role === "admin" ? pages : pages.map(page => ({ ...page, transcription: "" }));
-  return { persons: people, pages: allowedPages, revisions: history.filter(r => role === "admin" || !r.personId || visible.has(r.personId)).map(r => ({ ...r, detail: role === "admin" ? r.detail : null })), role, demo: !process.env.ADMIN_PASSWORD, title: "颍川陈氏宗谱" };
+  return {
+    persons: people,
+    pages: allowedPages,
+    revisions: history
+      .filter(r => role === "admin" || !r.personId || visible.has(r.personId))
+      .map(r => ({ ...r, detail: role === "admin" ? r.detail : null })),
+    role,
+    demo: !process.env.ADMIN_PASSWORD,
+    title: "李氏家谱",
+  };
 }
+
 const text = (value: unknown, max = 10000) => typeof value === "string" ? value.trim().slice(0, max) : "";
+
 function dualDate(value: unknown): DualDate | null {
   if (value === null || value === undefined) return null;
   if (typeof value !== "object") throw new Error("日期格式不正确");
@@ -49,6 +49,7 @@ function dualDate(value: unknown): DualDate | null {
   }
   return { original: text(item.original, 300), solar, certainty, ...(item.lunar && typeof item.lunar === "object" ? { lunar: item.lunar as DualDate["lunar"] } : {}) };
 }
+
 export function normalizePerson(input: Record<string, unknown>, id: string): Omit<Person, "createdAt" | "updatedAt" | "deletedAt"> {
   const name = text(input.name, 80);
   if (!name) throw new Error("请填写谱名，或填写「讳无考」");
@@ -57,14 +58,18 @@ export function normalizePerson(input: Record<string, unknown>, id: string): Omi
   const status = ["unrecorded", "recorded", "verified"].includes(String(input.status)) ? input.status as EntryStatus : "recorded";
   const sourcePageId = text(input.sourcePageId, 100) || null;
   if (status === "verified" && !sourcePageId) throw new Error("已校对条目必须关联老谱出处");
-  return { id, name, generation, gender: input.gender === "female" ? "female" : "male",
+  return {
+    id, name, generation, gender: input.gender === "female" ? "female" : "male",
     fatherId: text(input.fatherId, 100) || null, motherId: text(input.motherId, 100) || null,
-    courtesyName: text(input.courtesyName, 100), artName: text(input.artName, 100), aliases: Array.isArray(input.aliases) ? input.aliases.filter((a): a is string => typeof a === "string").map(a => a.slice(0, 100)) : [],
+    courtesyName: text(input.courtesyName, 100), artName: text(input.artName, 100),
+    aliases: Array.isArray(input.aliases) ? input.aliases.filter((a): a is string => typeof a === "string").map(a => a.slice(0, 100)) : [],
     birth: dualDate(input.birth), death: input.isAlive ? null : dualDate(input.death), isAlive: input.isAlive === true,
     spouse: text(input.spouse, 1000), nativePlace: text(input.nativePlace, 300), residence: text(input.residence, 300),
     biography: text(input.biography, 50000), status, hidden: input.hidden === true, sourcePageId,
-    original: text(input.original, 10000), note: text(input.note, 10000) };
+    original: text(input.original, 10000), note: text(input.note, 10000),
+  };
 }
+
 function validateFamily(person: Pick<Person, "id" | "fatherId" | "motherId" | "sourcePageId">, all: Person[], pages: SourcePage[], allowDeleted = false) {
   if (person.sourcePageId && !pages.some(p => p.id === person.sourcePageId && p.image)) throw new Error("关联的谱页不存在或缺少原图");
   const map = new Map(all.map(p => [p.id, p]));
@@ -81,19 +86,28 @@ function validateFamily(person: Pick<Person, "id" | "fatherId" | "motherId" | "s
     if (relative.motherId) queue.push(relative.motherId);
   }
 }
+
 export async function savePerson(input: Record<string, unknown>) {
   const id = text(input.id, 100) || crypto.randomUUID();
   const archive = await getArchive("admin");
   const previous = archive.persons.find(p => p.id === id);
   const clean = normalizePerson({ ...previous, ...input }, id);
   validateFamily(clean, archive.persons, archive.pages);
-  await db.transaction(async tx => {
-    if (previous) await tx.update(persons).set({ ...clean, updatedAt: new Date().toISOString() }).where(eq(persons.id, id));
-    else await tx.insert(persons).values(clean);
-    await tx.insert(revisions).values({ personId: id, name: clean.name, action: previous ? (clean.status === "verified" && previous.status !== "verified" ? "完成校对" : "更新人物资料") : "新增族人", detail: previous || { message: "新增人物条目" } });
+  db.transaction(tx => {
+    if (previous) tx.update(persons).set({ ...clean, updatedAt: new Date().toISOString() }).where(eq(persons.id, id)).run();
+    else tx.insert(persons).values(clean).run();
+    tx.insert(revisions).values({
+      id: crypto.randomUUID(),
+      personId: id,
+      name: clean.name,
+      action: previous ? (clean.status === "verified" && previous.status !== "verified" ? "完成校对" : "更新人物资料") : "新增族人",
+      detail: previous || { message: "新增人物条目" },
+      createdAt: new Date().toISOString(),
+    }).run();
   });
   return id;
 }
+
 export async function updatePage(input: Record<string, unknown>) {
   const id = text(input.id, 100);
   const [page] = await db.select().from(sourcePages).where(eq(sourcePages.id, id));
@@ -102,15 +116,17 @@ export async function updatePage(input: Record<string, unknown>) {
   const transcription = typeof input.transcription === "string" ? input.transcription.slice(0, 100000) : page.transcription;
   if (status === "verified" && !transcription.trim()) throw new Error("请先录入谱页原文，再标记为已校对");
   await db.update(sourcePages).set({ status, transcription, updatedAt: new Date().toISOString() }).where(eq(sourcePages.id, id));
-  await db.insert(revisions).values({ name: `卷${page.volume} · 第${page.pageNo}页`, action: status === "verified" ? "谱页完成校对" : "更新谱页", detail: { previous: page } });
+  await db.insert(revisions).values({ id: crypto.randomUUID(), name: `卷${page.volume} · 第${page.pageNo}页`, action: status === "verified" ? "谱页完成校对" : "更新谱页", detail: { previous: page }, createdAt: new Date().toISOString() });
 }
+
 export async function exportArchive() {
   const archive = await getArchive("admin");
-  await db.insert(backupEvents).values({ kind: "manual", status: "success", detail: `导出 ${archive.persons.length} 位族人与 ${archive.pages.length} 张谱页` });
-  return { schemaVersion: 1, exportedAt: new Date().toISOString(), title: archive.title, persons: archive.persons, pages: archive.pages, mediaManifest: [{ path: "/images/genealogy-page.png", note: "原型示例影像；真实媒体需通过已配置的私有存储适配器备份" }] };
+  await db.insert(backupEvents).values({ id: crypto.randomUUID(), kind: "manual", status: "success", detail: `导出 ${archive.persons.length} 位族人与 ${archive.pages.length} 张谱页`, createdAt: new Date().toISOString() });
+  return { schemaVersion: 1, exportedAt: new Date().toISOString(), title: archive.title, persons: archive.persons, pages: archive.pages, mediaManifest: [{ path: "/images/genealogy-page.png", note: "李氏家乘备份影像包" }] };
 }
+
 export async function restoreArchive(data: Record<string, unknown>) {
-  if (data.schemaVersion !== 1 || !Array.isArray(data.persons) || !Array.isArray(data.pages) || !data.persons.length) throw new Error("不是有效的家乘 v1 备份文件");
+  if (data.schemaVersion !== 1 || !Array.isArray(data.persons) || !Array.isArray(data.pages)) throw new Error("不是有效的家乘 v1 备份文件");
   const now = new Date().toISOString();
   const timestamp = (value: unknown): string | null => {
     if (value === undefined || value === null || value === "") return null;
@@ -132,14 +148,21 @@ export async function restoreArchive(data: Record<string, unknown>) {
       transcription: text(item.transcription, 100000), updatedAt: timestamp(item.updatedAt) || now };
   });
   for (const p of restored) validateFamily(p, restored, pages, !!p.deletedAt);
-  await db.transaction(async tx => {
-    await tx.delete(revisions); await tx.delete(persons); await tx.delete(sourcePages);
-    if (pages.length) await tx.insert(sourcePages).values(pages);
-    for (let i = 0; i < restored.length; i += 500) await tx.insert(persons).values(restored.slice(i, i + 500));
-    await tx.insert(revisions).values({ name: "全量恢复", action: "从 JSON 备份恢复", detail: { persons: restored.length, pages: pages.length } });
-    await tx.insert(backupEvents).values({ kind: "restore", status: "success", detail: `恢复 ${restored.length} 位族人` });
+  db.transaction(tx => {
+    tx.delete(revisions).run();
+    tx.delete(persons).run();
+    tx.delete(sourcePages).run();
+    if (pages.length) {
+      for (const page of pages) tx.insert(sourcePages).values(page).run();
+    }
+    for (const p of restored) {
+      tx.insert(persons).values(p).run();
+    }
+    tx.insert(revisions).values({ id: crypto.randomUUID(), name: "全量恢复", action: "从 JSON 备份恢复", detail: { persons: restored.length, pages: pages.length }, createdAt: new Date().toISOString() }).run();
+    tx.insert(backupEvents).values({ id: crypto.randomUUID(), kind: "restore", status: "success", detail: `恢复 ${restored.length} 位族人`, createdAt: new Date().toISOString() }).run();
   });
 }
+
 export async function recyclePerson(id: string, restore: boolean) {
   const [person] = await db.select().from(persons).where(eq(persons.id, id));
   if (!person) throw new Error("人物不存在");
@@ -147,13 +170,15 @@ export async function recyclePerson(id: string, restore: boolean) {
   if (!restore && children.some(c => !c.deletedAt)) throw new Error("此人仍有关联子女，请先调整亲属关系；也可选择整支隐藏");
   if (restore) { const archive = await getArchive("admin"); validateFamily(person, archive.persons, archive.pages); }
   await db.update(persons).set({ deletedAt: restore ? null : new Date().toISOString() }).where(eq(persons.id, id));
-  await db.insert(revisions).values({ personId: id, name: person.name, action: restore ? "从回收站恢复" : "移入回收站", detail: person });
+  await db.insert(revisions).values({ id: crypto.randomUUID(), personId: id, name: person.name, action: restore ? "从回收站恢复" : "移入回收站", detail: person, createdAt: new Date().toISOString() });
 }
+
 export async function rollbackRevision(id: string) {
   const [revision] = await db.select().from(revisions).where(eq(revisions.id, id));
   if (!revision?.personId || !revision.detail || typeof revision.detail !== "object" || !("id" in revision.detail)) throw new Error("这条记录没有可回滚的人物快照");
   await savePerson(revision.detail as Record<string, unknown>);
 }
+
 export async function uploadPages(volume: number, inputs: Record<string, unknown>[]) {
   if (!Number.isInteger(volume) || volume < 1 || volume > 999 || !Array.isArray(inputs) || !inputs.length || inputs.length > 20) throw new Error("请选择 1–20 张谱页并指定有效册号");
   const existing = await db.select().from(sourcePages).where(eq(sourcePages.volume, volume));
@@ -163,12 +188,14 @@ export async function uploadPages(volume: number, inputs: Record<string, unknown
     if (!/^data:image\/(jpeg|png|webp);base64,[A-Za-z0-9+/=]+$/.test(image) || image.length > 7 * 1024 * 1024) throw new Error("上传影像格式不正确或超过 5MB");
     return { id: crypto.randomUUID(), volume, pageNo: lastPage + i + 1, title: text(input.title, 100) || "新谱页", image, status: "unrecorded" as const, transcription: "" };
   });
-  await db.transaction(async tx => {
-    await tx.insert(sourcePages).values(pages);
-    await tx.insert(revisions).values({ name: `卷${volume}`, action: `存档 ${pages.length} 张谱页`, detail: { pageIds: pages.map(p => p.id) } });
+  db.transaction(tx => {
+    for (const page of pages) tx.insert(sourcePages).values(page).run();
+    tx.insert(revisions).values({ id: crypto.randomUUID(), name: `卷${volume}`, action: `存档 ${pages.length} 张谱页`, detail: { pageIds: pages.map(p => p.id) }, createdAt: new Date().toISOString() }).run();
   });
 }
+
 export async function getBackups() { return db.select().from(backupEvents).orderBy(desc(backupEvents.createdAt)).limit(20); }
+
 export function toGedcom(people: Person[]) {
   const clean = (s: string) => s.replace(/[\r\n]+/g, " ");
   const lines = ["0 HEAD", "1 SOUR JIACHENG", "1 GEDC", "2 VERS 5.5.1", "1 CHAR UTF-8"];

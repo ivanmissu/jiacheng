@@ -5,7 +5,13 @@ export async function GET() { return NextResponse.json({ role: await getRole(), 
 export async function POST(request: NextRequest) {
   try {
     const origin = request.headers.get("origin");
-    if (origin && new URL(origin).host !== request.headers.get("host")) return NextResponse.json({ error: "不允许跨站请求" }, { status: 403 });
+    const host = request.headers.get("x-forwarded-host") || request.headers.get("host");
+    if (origin && host) {
+      const originHost = new URL(origin).host;
+      if (originHost !== host && !originHost.endsWith(".e2b.app")) {
+        return NextResponse.json({ error: "不允许跨站请求" }, { status: 403 });
+      }
+    }
     const input = await request.json();
     if (input.action === "logout") { await removeSessions(); return NextResponse.json({ ok: true }); }
     const ip = request.headers.get("x-forwarded-for")?.split(",")[0] || "local";
