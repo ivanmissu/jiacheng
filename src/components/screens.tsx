@@ -3,7 +3,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { pinyin } from "pinyin-pro";
 import { ArrowDownUp, ArrowRight, ArrowUpRight, BookOpen, Check, ChevronRight, Download, FileText, GitBranch, Grid2X2, List, Plus, Printer, Search, SlidersHorizontal, Upload, UserRound, Users } from "lucide-react";
 import { useArchive } from "./archive-context";
-import { Avatar, Badge, EmptyState } from "./ui";
+import { Avatar, Badge, EmptyState, StaticImage } from "./ui";
 import { birthYear, generationLabel, lifeYears, type Person } from "@/lib/types";
 import { kinship } from "@/lib/kinship";
 
@@ -257,7 +257,7 @@ export function Timeline() {
         </span>
       </div>
       <div className="timeline-intro">
-        <img src="/images/family-landscape.webp" alt="故乡山水" />
+        <StaticImage asset="familyLandscape" alt="故乡山水" priority />
         <div>
           <span>岁月无声，谱有回响。</span>
           <p>从始祖肇启家业，到子孙繁衍散居四海，每一个年份，都是家族前行的一个坐标。</p>

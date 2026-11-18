@@ -7,6 +7,7 @@ const staticAssetExtension = "(?:avif|bmp|css|gif|ico|jpe?g|png|svg|webp|woff2?|
 const publicAsset = new RegExp(`^/[^?#\\s"')]+\\.${staticAssetExtension}(?:[?#][^\\s"')]+)?$`, "i");
 const urlReference = /url\(\s*["']?([^\s"')]+)["']?\s*\)/gi;
 const attributeReference = /(?:src|href)\s*=\s*(?:\{\s*)?["'](\/[^"']+)["']/gi;
+const stringReference = new RegExp(`["](?<path>\\/[^\"]+\\.${staticAssetExtension}(?:[?#][^\"]*)?)["]|['](?<singlePath>\\/[^']+\\.${staticAssetExtension}(?:[?#][^']*)?)[']`, "gi");
 const importReference = new RegExp(`from\\s*["'](\/[^"']+\\.${staticAssetExtension})["']`, "gi");
 const checkExtensions = new Set([".css", ".ts", ".tsx", ".js", ".jsx", ".mjs"]);
 const sourceRoots = ["src", "public"];
@@ -37,6 +38,7 @@ for (const root of sourceRoots) {
     const text = fs.readFileSync(file, "utf8");
 
     for (const match of text.matchAll(attributeReference)) verify(match[1], file);
+    for (const match of text.matchAll(stringReference)) verify(match.groups?.path || match.groups?.singlePath || "", file);
     for (const match of text.matchAll(importReference)) verify(match[1], file);
 
     for (const match of text.matchAll(urlReference)) {

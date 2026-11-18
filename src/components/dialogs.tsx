@@ -3,7 +3,7 @@ import { useRef, useState, type FormEvent } from "react";
 import { toPng } from "html-to-image";
 import { ArrowRight, Check, Copy, Download, GitBranch, LockKeyhole, Search, ShieldCheck } from "lucide-react";
 import { useArchive } from "./archive-context";
-import { Avatar, EmptyState, Modal } from "./ui";
+import { Avatar, EmptyState, Modal, StaticImage } from "./ui";
 import { matchesPerson } from "./screens";
 import { generationLabel, lifeYears, type Person } from "@/lib/types";
 
@@ -168,7 +168,7 @@ export function ShareDialog({ person, onClose }: { person?: Person; onClose: () 
             <div className="poster-brand">
               <span className="mini-brand-seal">李</span>李氏家乘<span>JIACHENG</span>
             </div>
-            <img src="/images/family-landscape.webp" alt="家族故乡山水" className="poster-landscape" />
+            <StaticImage asset="familyLandscape" alt="家族故乡山水" className="poster-landscape" loading="eager" />
             <div className="poster-heading">
               <span>李氏一脉 · 世代相承</span>
               <h2>{person ? person.name : "木有本，水有源。"}</h2>
@@ -313,7 +313,7 @@ export function AccessGate() {
 
   return (
     <div className="access-page">
-      <img src="/images/family-landscape.webp" alt="故乡山水" />
+      <StaticImage asset="familyLandscape" alt="故乡山水" priority />
       <div className="access-card">
         <div className="access-logo">
           <span className="brand-seal">李氏</span>

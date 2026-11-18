@@ -4,6 +4,22 @@ import { ArrowRight, X, Search } from "lucide-react";
 import { statusLabels, type EntryStatus } from "@/lib/types";
 export function Badge({ status, children }: { status?: EntryStatus; children?: ReactNode }) { return <span className={`badge ${status || "neutral"}`}><i />{children || (status && statusLabels[status])}</span>; }
 export function Avatar({ name, gender = "male", size = "normal" }: { name: string; gender?: string; size?: "small" | "normal" | "large" }) { return <span className={`avatar avatar-${size} ${gender === "female" ? "female" : ""}`}>{name.slice(-1)}</span>; }
+
+const staticImages = {
+  familyLandscape: { desktop: "/images/family-landscape.webp", mobile: "/images/family-landscape-mobile.webp", width: 1584, height: 672 },
+  oldGenealogy: { desktop: "/images/old-genealogy.webp", mobile: "/images/old-genealogy-mobile.webp", width: 1376, height: 768 },
+} as const;
+
+export function StaticImage({ asset, alt, className, priority = false, loading = "lazy" }: {
+  asset: keyof typeof staticImages; alt: string; className?: string; priority?: boolean; loading?: "eager" | "lazy";
+}) {
+  const image = staticImages[asset];
+  return <picture className="responsive-static-image">
+    <source media="(max-width: 760px)" srcSet={image.mobile} type="image/webp" />
+    <img src={image.desktop} alt={alt} className={className} width={image.width} height={image.height} loading={priority ? "eager" : loading} fetchPriority={priority ? "high" : undefined} decoding="async" />
+  </picture>;
+}
+
 export function SectionHeading({ title, subtitle, action, onAction, icon }: { title: string; subtitle?: string; action?: string; onAction?: () => void; icon?: ReactNode }) {
   return <div className="section-heading"><div><h2>{icon}{title}</h2>{subtitle && <p>{subtitle}</p>}</div>{action && <button className="text-link" onClick={onAction}>{action}<ArrowRight size={14} /></button>}</div>;
 }
