@@ -3,9 +3,10 @@
   "private": true,
   "scripts": {
     "dev": "next dev",
-    "build": "next build",
+    "build": "npm run check:assets && next build",
     "start": "next start",
     "lint": "eslint .",
+    "check:assets": "node scripts/check-static-assets.mjs",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {

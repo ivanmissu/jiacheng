@@ -122,7 +122,8 @@ export async function updatePage(input: Record<string, unknown>) {
 export async function exportArchive() {
   const archive = await getArchive("admin");
   await db.insert(backupEvents).values({ id: crypto.randomUUID(), kind: "manual", status: "success", detail: `导出 ${archive.persons.length} 位族人与 ${archive.pages.length} 张谱页`, createdAt: new Date().toISOString() });
-  return { schemaVersion: 1, exportedAt: new Date().toISOString(), title: archive.title, persons: archive.persons, pages: archive.pages, mediaManifest: [{ path: "/images/genealogy-page.png", note: "李氏家乘备份影像包" }] };
+  const mediaManifest = [...new Set(archive.pages.map(page => page.image).filter(image => image.startsWith("/images/")))].map(path => ({ path, note: "李氏家乘备份影像包" }));
+  return { schemaVersion: 1, exportedAt: new Date().toISOString(), title: archive.title, persons: archive.persons, pages: archive.pages, mediaManifest };
 }
 
 export async function restoreArchive(data: Record<string, unknown>) {
