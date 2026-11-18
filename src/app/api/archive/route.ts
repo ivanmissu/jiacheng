@@ -21,7 +21,13 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
   if (await getRole() !== "admin") return NextResponse.json({ error: "请先进入管理模式" }, { status: 403 });
   const origin = request.headers.get("origin");
-  if (origin && new URL(origin).host !== request.headers.get("host")) return NextResponse.json({ error: "不允许跨站请求" }, { status: 403 });
+  const host = request.headers.get("x-forwarded-host") || request.headers.get("host");
+  if (origin && host) {
+    const originHost = new URL(origin).host;
+    if (originHost !== host && !originHost.endsWith(".e2b.app")) {
+      return NextResponse.json({ error: "不允许跨站请求" }, { status: 403 });
+    }
+  }
   try {
     const input = await request.json();
     let id: string | undefined;
