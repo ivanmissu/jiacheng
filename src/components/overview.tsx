@@ -66,7 +66,7 @@ export function Overview() {
       </div>
 
       <section className="heritage-hero">
-        <img src="/images/family-landscape.png" alt="青山秀水，木本水源" className="hero-art" />
+        <img src="/images/family-landscape.webp" alt="青山秀水，木本水源" className="hero-art" />
         <div className="hero-wash" />
         <div className="hero-content">
           <span className="hero-eyebrow"><i />李氏一脉 · 世代相承</span>
@@ -122,7 +122,7 @@ export function Overview() {
         <section className="card digitization-card">
           <SectionHeading title="老谱数字化" icon={<BookOpen size={18} />} />
           <div className="old-book-photo">
-            <img src="/images/old-genealogy.png" alt="线装老谱与泛黄的书页" />
+            <img src="/images/old-genealogy.webp" alt="线装老谱与泛黄的书页" />
             <span>李氏家乘 · 老谱珍藏</span>
           </div>
           <div className="digital-progress-title">

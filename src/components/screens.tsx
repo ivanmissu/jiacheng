@@ -257,7 +257,7 @@ export function Timeline() {
         </span>
       </div>
       <div className="timeline-intro">
-        <img src="/images/family-landscape.png" alt="故乡山水" />
+        <img src="/images/family-landscape.webp" alt="故乡山水" />
         <div>
           <span>岁月无声，谱有回响。</span>
           <p>从始祖肇启家业，到子孙繁衍散居四海，每一个年份，都是家族前行的一个坐标。</p>

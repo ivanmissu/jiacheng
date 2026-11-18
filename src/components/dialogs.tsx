@@ -168,7 +168,7 @@ export function ShareDialog({ person, onClose }: { person?: Person; onClose: () 
             <div className="poster-brand">
               <span className="mini-brand-seal">李</span>李氏家乘<span>JIACHENG</span>
             </div>
-            <img src="/images/family-landscape.png" alt="家族故乡山水" className="poster-landscape" />
+            <img src="/images/family-landscape.webp" alt="家族故乡山水" className="poster-landscape" />
             <div className="poster-heading">
               <span>李氏一脉 · 世代相承</span>
               <h2>{person ? person.name : "木有本，水有源。"}</h2>
@@ -313,7 +313,7 @@ export function AccessGate() {
 
   return (
     <div className="access-page">
-      <img src="/images/family-landscape.png" alt="故乡山水" />
+      <img src="/images/family-landscape.webp" alt="故乡山水" />
       <div className="access-card">
         <div className="access-logo">
           <span className="brand-seal">李氏</span>

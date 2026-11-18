@@ -12,6 +12,9 @@ export const metadata: Metadata = {
 export default function RootLayout({ children }: { children: ReactNode }) {
   return (
     <html lang="zh-CN" suppressHydrationWarning>
+      <head>
+        <link rel="stylesheet" href="/fonts/heritage-serif.css" />
+      </head>
       <body suppressHydrationWarning>{children}</body>
     </html>
   );
