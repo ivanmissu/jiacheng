@@ -7,8 +7,8 @@ export type DualDate = {
 };
 export type Person = {
   id: string; name: string; gender: "male" | "female"; generation: number;
-  fatherId: string | null; motherId: string | null;
-  courtesyName: string; artName: string; aliases: string[];
+  fatherId: string | null; motherId: string | null; motherName: string;
+  generationName: string; aliases: string[];
   birth: DualDate | null; death: DualDate | null; isAlive: boolean;
   spouse: string; nativePlace: string; residence: string; biography: string;
   status: EntryStatus; hidden: boolean; sourcePageId: string | null;
@@ -31,6 +31,13 @@ export const statusLabels: Record<EntryStatus, string> = {
 };
 export const generationChars = ["", "一", "二", "三", "四", "五", "六", "七", "八", "九", "十", "十一", "十二", "十三", "十四", "十五", "十六", "十七", "十八", "十九", "二十"];
 export function generationLabel(n: number) { return `第${generationChars[n] || n}世`; }
+export function formatGenerationName(value?: string | null) {
+  const clean = value?.trim() || "";
+  if (!clean) return "";
+  if (clean.endsWith("辈")) return clean;
+  if (clean.endsWith("字")) return `${clean}辈`;
+  return `${clean}字辈`;
+}
 export function birthYear(person: Person) { return person.birth?.solar?.slice(0, 4) || person.birth?.original.match(/\d{4}/)?.[0] || "无考"; }
 export function lifeYears(person: Person) { return `${birthYear(person)} — ${person.isAlive ? "今" : person.death?.solar?.slice(0, 4) || "无考"}`; }
 export function visiblePeople(persons: Person[]) {

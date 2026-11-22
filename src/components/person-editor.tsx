@@ -15,8 +15,10 @@ export function PersonEditor({ initial, onClose }: { initial: Partial<Person>; o
     name: "",
     gender: "male",
     generation: defaultGeneration,
+    generationName: "",
     fatherId: null,
     motherId: null,
+    motherName: "",
     status: "recorded",
     isAlive: true,
     nativePlace: "",
@@ -29,6 +31,19 @@ export function PersonEditor({ initial, onClose }: { initial: Partial<Person>; o
 
   const patch = (key: keyof Person, value: unknown) => setPerson(p => ({ ...p, [key]: value }));
   const sameName = people.filter(p => p.name === person.name && p.id !== person.id);
+  const selectedFather = people.find(p => p.id === person.fatherId);
+  const fatherSpouses = selectedFather?.spouse
+    ? selectedFather.spouse.split(/[；;\n]/).map(s => s.trim()).filter(Boolean)
+    : [];
+  const femaleMembers = people.filter(p => p.gender === "female" && p.id !== person.id);
+  const linkedMother = people.find(p => p.id === person.motherId);
+  const sameGenNames = [
+    ...new Set(
+      people
+        .filter(p => p.generation === person.generation && p.generationName.trim())
+        .map(p => p.generationName.trim())
+    ),
+  ];
 
   async function save(e: FormEvent, verified = false) {
     e.preventDefault();
@@ -119,30 +134,31 @@ export function PersonEditor({ initial, onClose }: { initial: Partial<Person>; o
               )}
               <div className="form-row">
                 <label className="form-field">
-                  <span>字</span>
+                  <span>字辈</span>
                   <input
-                    value={person.courtesyName || ""}
-                    onChange={e => patch("courtesyName", e.target.value)}
-                    placeholder="如：静之"
+                    list={sameGenNames.length ? "generation-name-options" : undefined}
+                    value={person.generationName || ""}
+                    onChange={e => patch("generationName", e.target.value)}
+                    placeholder="如：德、承、文"
+                    maxLength={100}
                   />
+                  {sameGenNames.length > 0 && (
+                    <datalist id="generation-name-options">
+                      {sameGenNames.map(item => (
+                        <option key={item} value={item} />
+                      ))}
+                    </datalist>
+                  )}
                 </label>
                 <label className="form-field">
-                  <span>号</span>
+                  <span>别名 / 行用名</span>
                   <input
-                    value={person.artName || ""}
-                    onChange={e => patch("artName", e.target.value)}
-                    placeholder="如：青莲居士"
+                    value={aliases}
+                    onChange={e => setAliases(e.target.value)}
+                    placeholder="多个别名用顿号隔开，如：小远、阿远"
                   />
                 </label>
               </div>
-              <label className="form-field">
-                <span>别名 / 行用名</span>
-                <input
-                  value={aliases}
-                  onChange={e => setAliases(e.target.value)}
-                  placeholder="多个别名用顿号隔开，如：小远、阿远"
-                />
-              </label>
               <div className="form-row">
                 <label className="form-field">
                   <span>籍贯</span>
@@ -185,11 +201,27 @@ export function PersonEditor({ initial, onClose }: { initial: Partial<Person>; o
                     value={person.fatherId || ""}
                     onChange={e => {
                       const father = people.find(p => p.id === e.target.value);
-                      setPerson(p => ({
-                        ...p,
-                        fatherId: father?.id || null,
-                        generation: father ? father.generation + 1 : p.generation,
-                      }));
+                      const nextSpouses = father?.spouse
+                        ? father.spouse.split(/[；;\n]/).map(s => s.trim()).filter(Boolean)
+                        : [];
+                      setPerson(p => {
+                        const prevFather = people.find(item => item.id === p.fatherId);
+                        const prevSpouses = prevFather?.spouse
+                          ? prevFather.spouse.split(/[；;\n]/).map(s => s.trim()).filter(Boolean)
+                          : [];
+                        const canAutoFillMother =
+                          !p.motherId && (!p.motherName || prevSpouses.includes(p.motherName));
+                        return {
+                          ...p,
+                          fatherId: father?.id || null,
+                          generation: father ? father.generation + 1 : p.generation,
+                          motherName: canAutoFillMother
+                            ? nextSpouses.length === 1
+                              ? nextSpouses[0]
+                              : ""
+                            : p.motherName,
+                        };
+                      });
                     }}
                   >
                     <option value="">无记载 / 始迁祖</option>
@@ -202,22 +234,78 @@ export function PersonEditor({ initial, onClose }: { initial: Partial<Person>; o
                       ))}
                   </select>
                 </label>
-                <label className="form-field">
+                <div className="form-field">
                   <span>生母</span>
-                  <select
-                    value={person.motherId || ""}
-                    onChange={e => patch("motherId", e.target.value || null)}
-                  >
-                    <option value="">无记载 / 谱外配偶</option>
-                    {people
-                      .filter(p => p.gender === "female" && p.id !== person.id)
-                      .map(p => (
-                        <option key={p.id} value={p.id}>
-                          {p.name} · {generationLabel(p.generation)}
-                        </option>
+                  <input
+                    aria-label="生母"
+                    value={linkedMother ? linkedMother.name : person.motherName || ""}
+                    onChange={e =>
+                      setPerson(p => ({
+                        ...p,
+                        motherId: null,
+                        motherName: e.target.value,
+                      }))
+                    }
+                    placeholder="可直接填写姓名（如：王秀英、某氏）"
+                    maxLength={200}
+                  />
+                  {linkedMother && (
+                    <div className="mother-linked-tag">
+                      <span>已关联谱内族人：{linkedMother.name}（{generationLabel(linkedMother.generation)}）</span>
+                      <button
+                        type="button"
+                        aria-label="取消关联谱内生母"
+                        onClick={() => patch("motherId", null)}
+                      >
+                        ×
+                      </button>
+                    </div>
+                  )}
+                  {fatherSpouses.length > 0 && (
+                    <div className="mother-quick-picks">
+                      <span>父亲配偶：</span>
+                      {fatherSpouses.map(spouseName => (
+                        <button
+                          type="button"
+                          key={spouseName}
+                          className={`mother-chip ${!linkedMother && person.motherName === spouseName ? "active" : ""}`}
+                          onClick={() =>
+                            setPerson(p => ({
+                              ...p,
+                              motherId: null,
+                              motherName: spouseName,
+                            }))
+                          }
+                        >
+                          {spouseName}
+                        </button>
                       ))}
-                  </select>
-                </label>
+                    </div>
+                  )}
+                  {femaleMembers.length > 0 && (
+                    <div className="mother-link-row">
+                      <select
+                        aria-label="关联谱内已录女性族人"
+                        value={person.motherId || ""}
+                        onChange={e => {
+                          const m = femaleMembers.find(item => item.id === e.target.value);
+                          setPerson(p => ({
+                            ...p,
+                            motherId: m?.id || null,
+                            motherName: m ? m.name : p.motherName,
+                          }));
+                        }}
+                      >
+                        <option value="">或关联谱内已录女性族人（可选）…</option>
+                        {femaleMembers.map(p => (
+                          <option key={p.id} value={p.id}>
+                            {p.name} · {generationLabel(p.generation)}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                  )}
+                </div>
               </div>
               <div className="form-row">
                 <label className="form-field">

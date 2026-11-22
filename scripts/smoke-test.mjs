@@ -93,7 +93,7 @@ try {
   const upload = await post({ action: "uploadPages", volume: 1, pages: [{ title: "验证谱页", image: "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+jM1kAAAAASUVORK5CYII=" }] });
   assert.equal(upload.status, 200); assert(upload.data.archive.pages.some(p => p.title === "验证谱页"));
   assert.equal((await post({ action: "deletePerson", id: "smoke-child" })).status, 200);
-  const gedcom = await context.request.get(`${base}/api/archive?export=gedcom`); assert.equal(gedcom.status(), 200); assert((await gedcom.text()).includes("1 _COURTESY"));
+  const gedcom = await context.request.get(`${base}/api/archive?export=gedcom`); assert.equal(gedcom.status(), 200); assert((await gedcom.text()).includes("1 _GENERATION"));
   const jsonExport = await context.request.get(`${base}/api/archive?export=json`); const withMedia = await jsonExport.json(); assert.equal(withMedia.schemaVersion, 1);
   const mediaRestored = await post({ action: "import", data: withMedia, confirmation: "全量替换" }); assert.equal(mediaRestored.status, 200, JSON.stringify(mediaRestored.data));
   assert(mediaRestored.data.archive.persons.find(p => p.id === "smoke-child").deletedAt, "Recycle state must survive restoration");

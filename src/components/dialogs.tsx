@@ -5,7 +5,7 @@ import { ArrowRight, Check, Copy, Download, GitBranch, LockKeyhole, Search, Shie
 import { useArchive } from "./archive-context";
 import { Avatar, EmptyState, Modal, StaticImage } from "./ui";
 import { matchesPerson } from "./screens";
-import { generationLabel, lifeYears, type Person } from "@/lib/types";
+import { formatGenerationName, generationLabel, lifeYears, type Person } from "@/lib/types";
 
 export function IdentityDialog({ onClose }: { onClose: () => void }) {
   const { people, me, setMe, toast } = useArchive();
@@ -174,7 +174,7 @@ export function ShareDialog({ person, onClose }: { person?: Person; onClose: () 
               <h2>{person ? person.name : "木有本，水有源。"}</h2>
               <p>
                 {person
-                  ? `${generationLabel(person.generation)}${person.courtesyName ? ` · 字${person.courtesyName}` : ""}　${lifeYears(person)}`
+                  ? `${generationLabel(person.generation)}${person.generationName ? ` · ${formatGenerationName(person.generationName)}` : ""}　${lifeYears(person)}`
                   : "一部家谱，让思念有根可寻。"}
               </p>
             </div>
@@ -268,7 +268,7 @@ export function SourceDialog({ id, onClose }: { id: string; onClose: () => void 
               <Avatar name={p.name} size="small" />
               <div>
                 <strong>{p.name}</strong>
-                <span>{generationLabel(p.generation)} · {p.courtesyName || "字无考"}</span>
+                <span>{generationLabel(p.generation)}{p.generationName ? ` · ${formatGenerationName(p.generationName)}` : ""}</span>
               </div>
               <ArrowRight size={15} />
             </button>

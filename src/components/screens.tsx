@@ -4,7 +4,7 @@ import { pinyin } from "pinyin-pro";
 import { ArrowDownUp, ArrowRight, ArrowUpRight, BookOpen, Check, ChevronRight, Download, FileText, GitBranch, Grid2X2, List, Plus, Printer, Search, SlidersHorizontal, Upload, UserRound, Users } from "lucide-react";
 import { useArchive } from "./archive-context";
 import { Avatar, Badge, EmptyState, StaticImage } from "./ui";
-import { birthYear, generationLabel, lifeYears, type Person } from "@/lib/types";
+import { birthYear, formatGenerationName, generationLabel, lifeYears, type Person } from "@/lib/types";
 import { kinship } from "@/lib/kinship";
 
 export function matchesPerson(person: Person, query: string) {
@@ -12,8 +12,9 @@ export function matchesPerson(person: Person, query: string) {
   const q = query.toLowerCase().trim();
   return [
     person.name,
-    person.courtesyName,
-    person.artName,
+    person.generationName,
+    formatGenerationName(person.generationName),
+    person.motherName,
     ...person.aliases,
     person.nativePlace,
     person.residence,
@@ -63,7 +64,7 @@ export function Members() {
             <input
               value={query}
               onChange={e => setQuery(e.target.value)}
-              placeholder="搜索姓名、字、号、拼音首字母、籍贯…"
+              placeholder="搜索姓名、字辈、别名、拼音首字母、籍贯…"
               aria-label="搜索族人"
             />
             {query && <button onClick={() => setQuery("")} aria-label="清除搜索">×</button>}
@@ -118,7 +119,7 @@ export function Members() {
             <table className="members-table">
               <thead>
                 <tr>
-                  <th>姓名 / 字号</th>
+                  <th>姓名 / 字辈</th>
                   <th>世代</th>
                   <th>父亲</th>
                   <th>生卒年份</th>
@@ -146,8 +147,8 @@ export function Members() {
                             {p.hidden && <span className="hidden-label">整支隐藏</span>}
                           </strong>
                           <span>
-                            {p.courtesyName
-                              ? `字 ${p.courtesyName}`
+                            {p.generationName
+                              ? formatGenerationName(p.generationName)
                               : p.gender === "female"
                               ? "女"
                               : "男"}
@@ -174,7 +175,7 @@ export function Members() {
                 <h3>{p.name}</h3>
                 <p>
                   {generationLabel(p.generation)} ·{" "}
-                  {p.courtesyName ? `字 ${p.courtesyName}` : p.gender === "female" ? "女" : "男"}
+                  {p.generationName ? formatGenerationName(p.generationName) : p.gender === "female" ? "女" : "男"}
                 </p>
                 <span>{lifeYears(p)}</span>
                 <Badge status={p.status} />
@@ -676,7 +677,7 @@ export function FamilyBook() {
                 <div>
                   <h3>{p.name}</h3>
                   <span>
-                    {p.courtesyName ? `字 ${p.courtesyName}` : p.gender === "female" ? "女" : "男"}
+                    {p.generationName ? formatGenerationName(p.generationName) : p.gender === "female" ? "女" : "男"}
                   </span>
                   <span>{lifeYears(p)}</span>
                 </div>
@@ -684,6 +685,9 @@ export function FamilyBook() {
                   {p.fatherId
                     ? `${people.find(f => f.id === p.fatherId)?.name || "失考"}之${p.gender === "female" ? "女" : "子"}。`
                     : "本支始迁祖。"}
+                  {(people.find(m => m.id === p.motherId)?.name || p.motherName)
+                    ? `生母：${people.find(m => m.id === p.motherId)?.name || p.motherName}。`
+                    : ""}
                   {p.spouse ? `配偶：${p.spouse}。` : ""}
                   {p.nativePlace ? `籍贯${p.nativePlace}。` : ""}
                   {p.biography ? p.biography.slice(0, 125) : "生平事迹待考补。"}
