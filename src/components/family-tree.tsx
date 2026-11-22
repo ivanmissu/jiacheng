@@ -28,28 +28,80 @@ export function TreePreview() {
   // Find root ancestor with lowest generation
   const sorted = [...people].sort((a, b) => a.generation - b.generation);
   const root = sorted[0];
-  const gen2 = people.filter(p => p.fatherId === root.id || p.generation === root.generation + 1).slice(0, 3);
-  const gen3 = people.filter(p => gen2.some(g => g.id === p.fatherId) || p.generation === root.generation + 2).slice(0, 6);
+
+  const childrenByParent = new Map<string, Person[]>();
+  for (const p of people) {
+    if (p.fatherId) {
+      const children = childrenByParent.get(p.fatherId) || [];
+      children.push(p);
+      childrenByParent.set(p.fatherId, children);
+    }
+  }
+
+  // Preview is space-limited: at most 3 children per level, lines follow actual nodes.
+  const gen2 = (childrenByParent.get(root.id) || []).slice(0, 3);
+  const gen2Left = (i: number) =>
+    gen2.length === 1 ? 50 : gen2.length === 2 ? 30 + i * 40 : 18 + i * 32;
+
+  // Group third generation by parent so lines cluster under their own parent.
+  const gen3ByParent = new Map<string, Person[]>();
+  for (const parent of gen2) {
+    const kids = (childrenByParent.get(parent.id) || []).slice(0, 2);
+    if (kids.length) gen3ByParent.set(parent.id, kids);
+  }
+  const gen3 = [...gen3ByParent.values()].flat();
 
   const previewNodes: { person: Person; left: number; top: number; level: number }[] = [
     { person: root, left: 50, top: 7, level: 1 },
   ];
 
   gen2.forEach((p, i) => {
-    const left = gen2.length === 1 ? 50 : gen2.length === 2 ? 30 + i * 40 : 18 + i * 32;
-    previewNodes.push({ person: p, left, top: 83, level: 2 });
+    previewNodes.push({ person: p, left: gen2Left(i), top: 83, level: 2 });
   });
 
-  gen3.forEach((p, i) => {
-    const total = Math.max(gen3.length, 1);
-    const left = 10 + (i / Math.max(total - 1, 1)) * 80;
-    previewNodes.push({ person: p, left: total === 1 ? 50 : left, top: 161, level: 3 });
+  const gen3LeftById = new Map<string, number>();
+  gen2.forEach((parent, pi) => {
+    const kids = gen3ByParent.get(parent.id) || [];
+    const parentLeft = gen2Left(pi);
+    kids.forEach((p, i) => {
+      const left =
+        kids.length === 1
+          ? parentLeft
+          : Math.max(8, Math.min(92, parentLeft + (i === 0 ? -8 : 8)));
+      gen3LeftById.set(p.id, left);
+      previewNodes.push({ person: p, left, top: 161, level: 3 });
+    });
   });
+
+  // Draw lines dynamically: only for nodes actually shown (no extra lines for single child).
+  const lineParts: string[] = [];
+  if (gen2.length === 1) {
+    lineParts.push("M50 44 V83");
+  } else if (gen2.length > 1) {
+    const xs = gen2.map((_, i) => gen2Left(i));
+    lineParts.push("M50 44 V66");
+    lineParts.push(`M${Math.min(...xs)} 66 H${Math.max(...xs)}`);
+    for (const x of xs) lineParts.push(`M${x} 66 V83`);
+  }
+  gen2.forEach((parent, pi) => {
+    const kids = gen3ByParent.get(parent.id) || [];
+    if (!kids.length) return;
+    const parentLeft = gen2Left(pi);
+    const childXs = kids.map(k => gen3LeftById.get(k.id) ?? parentLeft);
+    if (childXs.length === 1) {
+      lineParts.push(`M${parentLeft} 120 V144 H${childXs[0]} V161`);
+    } else {
+      lineParts.push(`M${parentLeft} 120 V144`);
+      lineParts.push(`M${Math.min(...childXs)} 144 H${Math.max(...childXs)}`);
+      for (const x of childXs) lineParts.push(`M${x} 144 V161`);
+    }
+  });
+  const linesD = lineParts.join(" ");
 
   return (
     <div className="tree-preview">
       <svg className="tree-preview-lines" viewBox="0 0 100 214" preserveAspectRatio="none" aria-hidden="true">
-        <path d="M50 44 V66 M18 83 V66 H82 V83 M50 66 V83 M18 120 V144 M9 161 V144 H27 V161 M50 120 V144 M41 161 V144 H59 V161 M82 120 V144 M73 161 V144 H91 V161" />
+        {linesD && <path d={linesD} />}
       </svg>
       <span className="tree-generation generation-one">{generationLabel(root.generation)}</span>
       {gen2.length > 0 && <span className="tree-generation generation-two">{generationLabel(root.generation + 1)}</span>}
@@ -80,7 +132,8 @@ export function FamilyTree() {
   const defaultRootId = sortedPeople[0]?.id || "";
 
   const [rootId, setRootId] = useState(defaultRootId);
-  const [depth, setDepth] = useState(3);
+  // null = show all generations (有多少级显示多少级); number = limit to N generations
+  const [depth, setDepth] = useState<number | null>(null);
   const [scale, setScale] = useState(1);
   const [collapsed, setCollapsed] = useState<Set<string>>(new Set());
   const [pan, setPan] = useState({ x: 0, y: 18 });
@@ -111,6 +164,33 @@ export function FamilyTree() {
     return map;
   }, [people]);
 
+  // Longest descendant chain from root (ignoring collapsed), so depth can show all.
+  const maxDepth = useMemo(() => {
+    if (!root) return 1;
+    let max = 1;
+    const seen = new Set<string>();
+    const dfs = (person: Person, level: number) => {
+      if (seen.has(person.id)) return;
+      seen.add(person.id);
+      max = Math.max(max, level);
+      for (const c of childrenByParent.get(person.id) || []) dfs(c, level + 1);
+    };
+    dfs(root, 1);
+    return max;
+  }, [root, childrenByParent]);
+
+  const effectiveDepth = depth === null ? maxDepth : Math.min(depth, maxDepth);
+
+  // Switching branch shows all generations of the new branch by default.
+  useEffect(() => {
+    setDepth(null);
+  }, [rootId]);
+
+  // Keep a limited depth valid when the branch shrinks (e.g. members removed).
+  useEffect(() => {
+    if (depth !== null && depth > maxDepth) setDepth(null);
+  }, [depth, maxDepth]);
+
   const layout = useMemo(() => {
     const result: LayoutNode[] = [];
     let leaf = 0;
@@ -118,7 +198,7 @@ export function FamilyTree() {
     const walk = (person: Person, level: number, parent: string | null): number => {
       if (visited.has(person.id)) return 90;
       visited.add(person.id);
-      const children = level < depth - 1 && !collapsed.has(person.id) ? childrenByParent.get(person.id) || [] : [];
+      const children = level < effectiveDepth - 1 && !collapsed.has(person.id) ? childrenByParent.get(person.id) || [] : [];
       let x: number;
       if (!children.length) {
         x = leaf * 166 + 90;
@@ -131,8 +211,9 @@ export function FamilyTree() {
       return x;
     };
     if (root) walk(root, 0, null);
-    return { nodes: result, width: Math.max(leaf * 166 + 20, 700), height: depth * 155 + 80 };
-  }, [root, childrenByParent, depth, collapsed]);
+    const maxY = result.length ? Math.max(...result.map(n => n.y)) : 45;
+    return { nodes: result, width: Math.max(leaf * 166 + 20, 700), height: maxY + 134 };
+  }, [root, childrenByParent, effectiveDepth, collapsed]);
 
   useEffect(() => {
     const node = viewRef.current;
@@ -151,7 +232,7 @@ export function FamilyTree() {
       setScale(1);
       setPan({ x: viewport.width / 2 - rootX, y: 18 });
     }
-  }, [rootId, depth, viewport.width, rootX]);
+  }, [rootId, effectiveDepth, viewport.width, rootX]);
 
   const nodes = new Map(layout.nodes.map(n => [n.person.id, n]));
   const bounds = {
@@ -195,7 +276,7 @@ export function FamilyTree() {
     const p = people.find(p => p.id === me);
     if (p) {
       setRootId(p.fatherId || p.id);
-      setDepth(3);
+      setDepth(null);
       reset();
     }
   }
@@ -300,8 +381,12 @@ export function FamilyTree() {
             </label>
             <label>
               显示
-              <select value={depth} onChange={e => setDepth(Number(e.target.value))}>
-                {[2, 3, 4, 5].map(n => (
+              <select
+                value={depth === null ? "all" : String(effectiveDepth)}
+                onChange={e => setDepth(e.target.value === "all" ? null : Number(e.target.value))}
+              >
+                <option value="all">全部（{maxDepth} 代）</option>
+                {Array.from({ length: Math.max(0, maxDepth - 2) }, (_, i) => i + 2).map(n => (
                   <option key={n} value={n}>
                     {n} 代世系
                   </option>
@@ -437,7 +522,7 @@ export function FamilyTree() {
 
         <div className="tree-bottom-note">
           <span>
-            <i className="little-green-dot" />当前支系 {layout.nodes.length} 位族人 · {depth} 代窗口
+            <i className="little-green-dot" />当前支系 {layout.nodes.length} 位族人 · {depth === null ? `全部 ${maxDepth} 代` : `${effectiveDepth} 代窗口（共 ${maxDepth} 代）`}
           </span>
           <button className="text-link" onClick={() => navigate("members")}>
             在名录中查找族人<List size={14} />
