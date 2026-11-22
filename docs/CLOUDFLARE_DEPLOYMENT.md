@@ -89,8 +89,8 @@ CREATE TABLE IF NOT EXISTS family_persons (
   generation INTEGER NOT NULL DEFAULT 1,
   father_id TEXT,
   mother_id TEXT,
-  courtesy_name TEXT NOT NULL DEFAULT '',
-  art_name TEXT NOT NULL DEFAULT '',
+  mother_name TEXT NOT NULL DEFAULT '',
+  generation_name TEXT NOT NULL DEFAULT '',
   aliases TEXT NOT NULL DEFAULT '[]',
   birth TEXT,
   death TEXT,
@@ -266,7 +266,7 @@ npx wrangler secret put ACCESS_CODE
    - 首页居中展示**「录入第一代始祖」**。
 2. **录入第一位始迁祖**：
    - 点击**「录入第一代始祖」**，弹出族人信息编辑框。
-   - 填写姓名（如始祖姓名）、字号、生卒年（支持输入农历自动换算公历）。
+   - 填写姓名（如始祖姓名）、字辈、生卒年（支持输入农历自动换算公历）。
    - 点击“保存族人”，提示保存成功并实时留存修订记录。
 3. **查验世系图与名录**：
    - 点击侧边栏“世系图”，确认始祖节点已居中显示。

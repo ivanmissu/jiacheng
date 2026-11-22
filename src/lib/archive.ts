@@ -61,7 +61,8 @@ export function normalizePerson(input: Record<string, unknown>, id: string): Omi
   return {
     id, name, generation, gender: input.gender === "female" ? "female" : "male",
     fatherId: text(input.fatherId, 100) || null, motherId: text(input.motherId, 100) || null,
-    courtesyName: text(input.courtesyName, 100), artName: text(input.artName, 100),
+    motherName: text(input.motherName, 200),
+    generationName: text(input.generationName, 100),
     aliases: Array.isArray(input.aliases) ? input.aliases.filter((a): a is string => typeof a === "string").map(a => a.slice(0, 100)) : [],
     birth: dualDate(input.birth), death: input.isAlive ? null : dualDate(input.death), isAlive: input.isAlive === true,
     spouse: text(input.spouse, 1000), nativePlace: text(input.nativePlace, 300), residence: text(input.residence, 300),
@@ -202,14 +203,14 @@ export function toGedcom(people: Person[]) {
   const lines = ["0 HEAD", "1 SOUR JIACHENG", "1 GEDC", "2 VERS 5.5.1", "1 CHAR UTF-8"];
   for (const p of people.filter(p => !p.deletedAt)) {
     lines.push(`0 @${p.id}@ INDI`, `1 NAME ${clean(p.name)}`, `1 SEX ${p.gender === "female" ? "F" : "M"}`, `1 _GENERATION ${p.generation}`);
-    if (p.courtesyName) lines.push(`1 _COURTESY ${clean(p.courtesyName)}`);
-    if (p.artName) lines.push(`1 _ARTNAME ${clean(p.artName)}`);
+    if (p.generationName) lines.push(`1 _GENERATION_NAME ${clean(p.generationName)}`);
     if (p.birth?.solar) lines.push("1 BIRT", `2 DATE ${p.birth.solar}`);
     if (p.birth?.original) lines.push(`1 _BIRTH_ORIGINAL ${clean(p.birth.original)}`);
     if (p.death?.solar) lines.push("1 DEAT", `2 DATE ${p.death.solar}`);
     if (p.biography) lines.push(`1 NOTE ${clean(p.biography)}`);
     if (p.fatherId) lines.push(`1 FAMC @F-${p.fatherId}@`);
     if (p.sourcePageId) lines.push(`1 _SOURCE_PAGE ${clean(p.sourcePageId)}`);
+    if (p.motherName) lines.push(`1 _MOTHER_TEXT ${clean(p.motherName)}`);
     if (p.spouse) lines.push(`1 _SPOUSE_TEXT ${clean(p.spouse)}`);
   }
   for (const p of people) {

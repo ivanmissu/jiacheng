@@ -3,7 +3,7 @@ import { useMemo } from "react";
 import { ArrowRight, BookOpen, CalendarDays, ChevronRight, Clock3, GitBranch, MapPin, Plus, ShieldCheck, Sparkles, Users } from "lucide-react";
 import { useArchive } from "./archive-context";
 import { Avatar, SectionHeading, StaticImage } from "./ui";
-import { generationLabel, lifeYears } from "@/lib/types";
+import { formatGenerationName, generationLabel, lifeYears } from "@/lib/types";
 import { TreePreview } from "./family-tree";
 import { Solar } from "lunar-javascript";
 
@@ -160,7 +160,7 @@ export function Overview() {
                     <Avatar name={p.name} size="large" />
                     <span>{generationLabel(p.generation)}</span>
                   </div>
-                  <h3>{p.name}<span>{p.courtesyName && `字 ${p.courtesyName}`}</span></h3>
+                  <h3>{p.name}<span>{p.generationName && formatGenerationName(p.generationName)}</span></h3>
                   <p className="story-years">{lifeYears(p)}</p>
                   <p className="story-excerpt">{p.biography ? `${p.biography.slice(0, 42)}……` : "生平事迹待考补。"}</p>
                   <span className="story-link">读其生平 <ArrowRight size={13} /></span>

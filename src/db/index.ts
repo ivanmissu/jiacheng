@@ -25,8 +25,8 @@ function initSqlite(): Database.Database {
       generation INTEGER NOT NULL DEFAULT 1,
       father_id TEXT,
       mother_id TEXT,
-      courtesy_name TEXT NOT NULL DEFAULT '',
-      art_name TEXT NOT NULL DEFAULT '',
+      mother_name TEXT NOT NULL DEFAULT '',
+      generation_name TEXT NOT NULL DEFAULT '',
       aliases TEXT NOT NULL DEFAULT '[]',
       birth TEXT,
       death TEXT,
@@ -79,6 +79,14 @@ function initSqlite(): Database.Database {
       created_at TEXT NOT NULL
     );
   `);
+
+  const personColumns = sqlite.pragma("table_info(family_persons)") as Array<{ name: string }>;
+  if (!personColumns.some(col => col.name === "generation_name")) {
+    sqlite.exec("ALTER TABLE family_persons ADD COLUMN generation_name TEXT NOT NULL DEFAULT '';");
+  }
+  if (!personColumns.some(col => col.name === "mother_name")) {
+    sqlite.exec("ALTER TABLE family_persons ADD COLUMN mother_name TEXT NOT NULL DEFAULT '';");
+  }
 
   if (process.env.NODE_ENV !== "production") {
     globalForDb.__arenaBetterSqlite = sqlite;
